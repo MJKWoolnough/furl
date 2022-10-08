@@ -18,6 +18,16 @@ const (
 	defaultRetries   = 100
 	maxURLLength     = 2048
 	maxKeyLength     = 2048
+
+	unrecognisedContentType = "unrecognised content-type"
+	failedReadRequest       = "failed to read request"
+	invalidURL              = "invalid url"
+	failedKeyGeneration     = "failed to generate key"
+	invalidKey              = "invalid key"
+	keyExists               = "key exists"
+
+	optionsPost    = "OPTIONS, POST"
+	optionsGetHead = "OPTIONS, GET, HEAD"
 )
 
 func allValid(_ string) bool {
@@ -112,15 +122,15 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		url.URL = sb.String()
 		contentType = "plain"
 	default:
-		http.Error(w, "unrecognised content-type", http.StatusBadRequest)
+		http.Error(w, unrecognisedContentType, http.StatusBadRequest)
 		return
 	}
 	if err != nil {
-		http.Error(w, "failed to read request", http.StatusBadRequest)
+		http.Error(w, failedReadRequest, http.StatusBadRequest)
 		return
 	}
 	if len(url.URL) > maxURLLength || url.URL == "" || !f.urlValidator(url.URL) {
-		http.Error(w, "invalid url", http.StatusBadRequest)
+		http.Error(w, invalidURL, http.StatusBadRequest)
 		return
 	}
 	url.Key = path.Base(r.URL.Path)
@@ -138,17 +148,17 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if idLength == maxKeyLength {
-				http.Error(w, "failed to generate key", http.StatusInternalServerError)
+				http.Error(w, failedKeyGeneration, http.StatusInternalServerError)
 				return
 			}
 		}
 	} else {
 		if len(url.Key) > maxKeyLength || !f.keyValidator(url.Key) {
-			http.Error(w, "invalid key", http.StatusBadRequest)
+			http.Error(w, invalidKey, http.StatusBadRequest)
 			return
 		}
 		if _, ok := f.urls[url.Key]; ok {
-			http.Error(w, "key exists", http.StatusMethodNotAllowed)
+			http.Error(w, keyExists, http.StatusMethodNotAllowed)
 			return
 		}
 	}
@@ -167,15 +177,15 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 func (f *Furl) options(w http.ResponseWriter, r *http.Request) {
 	key := path.Base(r.URL.Path)
 	if key == "" {
-		w.Header().Add("Allow", "OPTIONS, POST")
+		w.Header().Add("Allow", optionsPost)
 		return
 	}
 	f.mu.RLock()
 	_, ok := f.urls[key]
 	f.mu.RUnlock()
 	if ok {
-		w.Header().Add("Allow", "OPTIONS, GET, HEAD")
+		w.Header().Add("Allow", optionsGetHead)
 	} else {
-		w.Header().Add("Allow", "OPTIONS, POST")
+		w.Header().Add("Allow", optionsPost)
 	}
 }
