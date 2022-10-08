@@ -3,6 +3,7 @@ package furl
 import (
 	"io"
 	"math/rand"
+	"net/url"
 
 	"vimagination.zapto.org/byteio"
 )
@@ -13,6 +14,14 @@ func URLValidator(fn func(string) bool) Option {
 	return func(f *Furl) {
 		f.urlValidator = fn
 	}
+}
+
+func HTTPURL(uri string) bool {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return false
+	}
+	return (u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != "" && u.User == nil
 }
 
 func KeyValidator(fn func(string) bool) Option {
