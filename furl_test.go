@@ -172,6 +172,24 @@ func TestPost(t *testing.T) {
 			Response:    "AAAAAA",
 			Status:      http.StatusOK,
 		},
+		{ // 13
+			Body:        "<furl><key>TEST1</key><url>http://google.com</url></furl>",
+			ContentType: "text/xml",
+			Response:    "<furl><key>TEST1</key><url>http://google.com</url></furl>",
+			Status:      http.StatusOK,
+		},
+		{ // 14
+			Body:        `{"key":"TEST2","url":"http://api.microsoft.com"}`,
+			ContentType: "application/json",
+			Response:    `{"key":"TEST2","url":"http://api.microsoft.com"}`,
+			Status:      http.StatusOK,
+		},
+		{ // 15
+			Body:        "key=TEST3&url=https://www.example.com",
+			ContentType: "application/x-www-form-urlencoded",
+			Response:    "TEST3",
+			Status:      http.StatusOK,
+		},
 	} {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/"+test.Key, strings.NewReader(test.Body))
