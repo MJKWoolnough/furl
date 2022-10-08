@@ -85,7 +85,7 @@ func (n *nonrand) Int63() int64 {
 func (nonrand) Seed(_ int64) {}
 
 func TestPostBasic(t *testing.T) {
-	rs := nonrand{0, 0, 1, 2, 3, 4}
+	rs := nonrand{0, 0, 1, 2}
 	f := New(MemStore(map[string]string{
 		"AA": "http://www.google.com",
 	}), RandomSource(&rs), KeyLength(1), URLValidator(HTTPURL))
@@ -109,6 +109,18 @@ func TestPostBasic(t *testing.T) {
 			Body:        "http://google.com",
 			ContentType: "text/plain",
 			Response:    "AQ",
+			Status:      http.StatusOK,
+		},
+		{
+			Body:        "http://google.com",
+			ContentType: "text/plain",
+			Response:    "Ag",
+			Status:      http.StatusOK,
+		},
+		{
+			Body:        "http://google.com",
+			ContentType: "text/plain",
+			Response:    "AAA",
 			Status:      http.StatusOK,
 		},
 	} {
