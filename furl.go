@@ -5,14 +5,41 @@ import (
 	"sync"
 )
 
+const (
+	defaultKeyLength = 6
+	defaultRetries   = 100
+)
+
+func allValid(_ string) bool {
+	return true
+}
+
+type loader interface {
+	Load() (map[string]string, error)
+	Save(key, url string) error
+}
+
+func save(_, _ string) error {
+	return nil
+}
+
 type Furl struct {
+	urlValidator, keyValidator func(string) bool
+	keyLength, retries         uint
+	save                       func(string, string) error
+
 	mu   sync.RWMutex
 	urls map[string]string
 }
 
 func New() *Furl {
 	return &Furl{
-		urls: make(map[string]string),
+		urlValidator: allValid,
+		keyValidator: allValid,
+		keyLength:    defaultKeyLength,
+		retries:      defaultRetries,
+		save:         save,
+		urls:         make(map[string]string),
 	}
 }
 
