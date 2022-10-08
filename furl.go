@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -96,6 +97,20 @@ func (f *Furl) get(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func writeError(w http.ResponseWriter, status int, contentType, err string) {
+	var format string
+	switch contentType {
+	case "text/json", "application/json":
+		format = "{\"error\": %q}"
+	case "text/xml", "application/xml":
+		format = "<error>%s</error>"
+	default:
+		format = "%s"
+	}
+	w.WriteHeader(status)
+	fmt.Fprintf(w, format, err)
+}
+
 func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	var (
 		data struct {
@@ -122,12 +137,13 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, unrecognisedContentType, http.StatusBadRequest)
 		return
 	}
+	w.Header().Set("Content-Type", contentType)
 	if err != nil {
-		http.Error(w, failedReadRequest, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, contentType, failedReadRequest)
 		return
 	}
 	if len(data.URL) > maxURLLength || data.URL == "" || !f.urlValidator(data.URL) {
-		http.Error(w, invalidURL, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, contentType, invalidURL)
 		return
 	}
 	data.Key = path.Base("/" + r.URL.Path)
@@ -145,23 +161,22 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if idLength == maxKeyLength {
-				http.Error(w, failedKeyGeneration, http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, contentType, failedKeyGeneration)
 				return
 			}
 		}
 	} else {
 		if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
-			http.Error(w, invalidKey, http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, contentType, invalidKey)
 			return
 		}
 		if _, ok := f.urls[data.Key]; ok {
-			http.Error(w, keyExists, http.StatusMethodNotAllowed)
+			writeError(w, http.StatusMethodNotAllowed, contentType, keyExists)
 			return
 		}
 	}
 	f.urls[data.Key] = data.URL
 	f.save(data.Key, data.URL)
-	w.Header().Set("Content-Type", contentType)
 	switch contentType {
 	case "text/json", "application/json":
 		json.NewEncoder(w).Encode(data)
