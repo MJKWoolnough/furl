@@ -52,6 +52,10 @@ func (w *wrappedResponseWriter) Write(p []byte) (int, error) {
 	case http.StatusBadRequest, http.StatusUnprocessableEntity, http.StatusMethodNotAllowed:
 		return len(p), nil
 	default:
+		if w.code != 0 {
+			w.ResponseWriter.WriteHeader(w.code)
+			w.code = 0
+		}
 		return w.ResponseWriter.Write(p)
 	}
 }
