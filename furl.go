@@ -108,19 +108,16 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	switch contentType {
 	case "text/json", "application/json":
 		json.NewDecoder(r.Body).Decode(&data)
-		contentType = "json"
-	case "text/xml":
+	case "text/xml", "application/xml":
 		err = xml.NewDecoder(r.Body).Decode(&data)
-		contentType = "xml"
 	case "application/x-www-form-urlencoded":
 		err = r.ParseForm()
 		data.URL = r.PostForm.Get("url")
-		contentType = "html"
+		contentType = "text/html"
 	case "text/plain":
 		var sb strings.Builder
 		_, err = io.Copy(&sb, r.Body)
 		data.URL = sb.String()
-		contentType = "plain"
 	default:
 		http.Error(w, unrecognisedContentType, http.StatusBadRequest)
 		return
@@ -164,12 +161,13 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	}
 	f.urls[data.Key] = data.URL
 	f.save(data.Key, data.URL)
+	w.Header().Set("Content-Type", contentType)
 	switch contentType {
-	case "json":
+	case "text/json", "application/json":
 		json.NewEncoder(w).Encode(data)
-	case "xml":
+	case "text/xml", "application/xml":
 		json.NewEncoder(w).Encode(data)
-	case "html", "text":
+	case "text/html", "text/plain":
 		io.WriteString(w, data.Key)
 	}
 }
