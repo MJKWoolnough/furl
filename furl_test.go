@@ -84,14 +84,16 @@ func (n *nonrand) Int63() int64 {
 
 func (nonrand) Seed(_ int64) {}
 
-func TestPostBasic(t *testing.T) {
+func TestPost(t *testing.T) {
 	rs := nonrand{0, 0, 1, 2}
 	f := New(MemStore(map[string]string{
 		"AA": "http://www.google.com",
-	}), RandomSource(&rs), KeyLength(1), URLValidator(HTTPURL))
+	}), RandomSource(&rs), KeyLength(1), URLValidator(HTTPURL), KeyValidator(func(key string) bool {
+		return key != "ABC"
+	}))
 	for n, test := range [...]struct {
-		Body, ContentType, Response string
-		Status                      int
+		Body, Key, ContentType, Response string
+		Status                           int
 	}{
 		{
 			Body:        "ftp://google.com",
@@ -119,13 +121,14 @@ func TestPostBasic(t *testing.T) {
 		},
 		{
 			Body:        "http://google.com",
+			Key:         "ABC",
 			ContentType: "text/plain",
-			Response:    "AAA",
-			Status:      http.StatusOK,
+			Response:    invalidKey,
+			Status:      http.StatusUnprocessableEntity,
 		},
 	} {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(test.Body))
+		r := httptest.NewRequest(http.MethodPost, "/"+test.Key, strings.NewReader(test.Body))
 		r.Header.Set("Content-Type", test.ContentType)
 		f.ServeHTTP(w, r)
 		if w.Code != test.Status {

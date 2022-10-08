@@ -87,6 +87,10 @@ func (f *Furl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (f *Furl) get(w http.ResponseWriter, r *http.Request) {
 	key := path.Base(r.URL.Path)
+	if !f.keyValidator(key) {
+		http.Error(w, invalidKey, http.StatusUnprocessableEntity)
+		return
+	}
 	f.mu.RLock()
 	url, ok := f.urls[key]
 	f.mu.RUnlock()
@@ -167,7 +171,7 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
-			writeError(w, http.StatusBadRequest, contentType, invalidKey)
+			writeError(w, http.StatusUnprocessableEntity, contentType, invalidKey)
 			return
 		}
 		if _, ok := f.urls[data.Key]; ok {
@@ -189,8 +193,11 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 
 func (f *Furl) options(w http.ResponseWriter, r *http.Request) {
 	key := path.Base(r.URL.Path)
-	if key == "" {
+	if key == "" || key == "/" {
 		w.Header().Add("Allow", optionsPost)
+	} else if !f.keyValidator(key) {
+		http.Error(w, invalidKey, http.StatusUnprocessableEntity)
+		return
 	} else {
 		f.mu.RLock()
 		_, ok := f.urls[key]
