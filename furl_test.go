@@ -3,6 +3,7 @@ package furl
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -66,6 +67,61 @@ func TestGet(t *testing.T) {
 			t.Errorf("test %d: expecting response code %d, got %d", n+1, test.Status, w.Code)
 		} else if url := w.Header().Get("Location"); url != test.Location {
 			t.Errorf("test %d: expecting Location header to be %q, got %q", n+1, test.Location, url)
+		}
+	}
+}
+
+type nonrand []int64
+
+func (n *nonrand) Int63() int64 {
+	if len(*n) == 0 {
+		return 0
+	}
+	i := (*n)[0]
+	*n = (*n)[1:]
+	return i
+}
+
+func (nonrand) Seed(_ int64) {}
+
+func TestPostBasic(t *testing.T) {
+	rs := nonrand{0, 0, 1, 2, 3, 4}
+	f := New(MemStore(map[string]string{
+		"AA": "http://www.google.com",
+	}), RandomSource(&rs), KeyLength(1), URLValidator(HTTPURL))
+	for n, test := range [...]struct {
+		Body, ContentType, Response string
+		Status                      int
+	}{
+		{
+			Body:        "ftp://google.com",
+			ContentType: "unknown",
+			Response:    unrecognisedContentType,
+			Status:      http.StatusBadRequest,
+		},
+		{
+			Body:        "ftp://google.com",
+			ContentType: "text/plain",
+			Response:    invalidURL,
+			Status:      http.StatusBadRequest,
+		},
+		{
+			Body:        "http://google.com",
+			ContentType: "text/plain",
+			Response:    "AQ",
+			Status:      http.StatusOK,
+		},
+	} {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(test.Body))
+		r.Header.Set("Content-Type", test.ContentType)
+		f.ServeHTTP(w, r)
+		if w.Code != test.Status {
+			t.Errorf("test %d: expecting response code %d, got %d", n+1, test.Status, w.Code)
+		} else if response := strings.TrimSpace(w.Body.String()); response != test.Response {
+			t.Errorf("test %d: expecting response %q, got %q", n+1, test.Response, response)
+		} else if contentType := w.Header().Get("Content-Type"); w.Code == 200 && contentType != test.ContentType {
+			t.Errorf("test %d: expecting return content type %q, got %q", n+1, test.ContentType, contentType)
 		}
 	}
 }
