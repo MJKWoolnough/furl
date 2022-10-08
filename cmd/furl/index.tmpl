@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<title>Furl - URL Shortener</title>
+		<link rel="shortcut icon" size="any" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 77 87'%3E%3Cdefs%3E%3CclipPath id='sail'%3E%3Cpath d='M44,71 q30,-20 10,-70 l-20,2 q-3,0 -5,5 l-10,40 q-2,5 5,10' /%3E%3C/clipPath%3E%3CclipPath id='head'%3E%3Ccircle cx='16' cy='56' r='5' /%3E%3C/clipPath%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='%230ff' /%3E%3Cpath d='M1,86 h50 l25,-10 l-16,-8 h-50 z' fill='%23f00' stroke='%23000' stroke-width='2' stroke-linejoin='round' /%3E%3Cpath d='M6,76 l-5,10 h50 l25,-10 z' fill='%23f00' /%3E%3Cpath d='M6,76 l4,-8 h50 l16,8 z' fill='%23800' /%3E%3Cg clip-path='url(%23sail)' stroke-width='5' fill='none'%3E%3Crect width='100%25' height='100%25' fill='%23f8f8f8' /%3E%3Cpath d='M0,46 q50,-20 100,15' stroke='%23f00' /%3E%3Cpath d='M0,51 q50,-20 100,15' stroke='%2300f' /%3E%3C/g%3E%3Cpath d='M36,76 l8,-5 q30,-20 10,-70 M18,51 l-2,1 l40,5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' /%3E%3Cg stroke-width='5' stroke-linecap='round' stroke-linjoin='round' fill='none' stroke='%23fc8'%3E%3Cpath d='M22,61 l6,-6' stroke='%23eb7' /%3E%3Cpath d='M23,69 l12,1.2 l5,8' stroke='%23eb7' stroke-width='4.9' stroke-linejoin='round' /%3E%3Cpath d='M23,69 l10,1' stroke='%23007' /%3E%3Cpath d='M19,61 l5,8' stroke='%23008' stroke-width='8' /%3E%3Cpath d='M23,62 l7,-7' /%3E%3Cpath d='M24,70 l12,1.2 l5,8' stroke-width='4.9' stroke-linejoin='round' /%3E%3Cpath d='M24,70 l10,1' stroke='%23008' /%3E%3C/g%3E%3Cg clip-path='url(%23head)'%3E%3Crect width='100%25' height='100%25' fill='%23fc8' /%3E%3Cpath d='M16,56 l-8,-5' stroke='%23f80' stroke-width='10' /%3E%3C/g%3E%3C/svg%3E" />
+		<style type="text/css">body{background-color:#0ff;color:#000;text-align:center}img{max-width:100%;width:15em;margin-bottom: 2em}.error{color:red}input[type=checkbox]:not(:checked)+input{display:none}</style>
+	</head>
+	<body>
+		<h1>Furl</h1>
+		<img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 77 87'%3E%3Cdefs%3E%3CclipPath id='sail'%3E%3Cpath d='M44,71 q30,-20 10,-70 l-20,2 q-3,0 -5,5 l-10,40 q-2,5 5,10' /%3E%3C/clipPath%3E%3CclipPath id='head'%3E%3Ccircle cx='16' cy='56' r='5' /%3E%3C/clipPath%3E%3C/defs%3E%3Cpath d='M1,86 h50 l25,-10 l-16,-8 h-50 z' fill='%23f00' stroke='%23000' stroke-width='2' stroke-linejoin='round' /%3E%3Cpath d='M6,76 l-5,10 h50 l25,-10 z' fill='%23f00' /%3E%3Cpath d='M6,76 l4,-8 h50 l16,8 z' fill='%23800' /%3E%3Cg clip-path='url(%23sail)' stroke-width='5' fill='none'%3E%3Crect width='100%25' height='100%25' fill='%23f8f8f8' /%3E%3Cpath d='M0,46 q50,-20 100,15' stroke='%23f00' /%3E%3Cpath d='M0,51 q50,-20 100,15' stroke='%2300f' /%3E%3C/g%3E%3Cpath d='M36,76 l8,-5 q30,-20 10,-70 M18,51 l-2,1 l40,5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' /%3E%3Cg stroke-width='5' stroke-linecap='round' stroke-linjoin='round' fill='none' stroke='%23fc8'%3E%3Cpath d='M22,61 l6,-6' stroke='%23eb7' /%3E%3Cpath d='M23,69 l12,1.2 l5,8' stroke='%23eb7' stroke-width='4.9' stroke-linejoin='round' /%3E%3Cpath d='M23,69 l10,1' stroke='%23007' /%3E%3Cpath d='M19,61 l5,8' stroke='%23008' stroke-width='8' /%3E%3Cpath d='M23,62 l7,-7' /%3E%3Cpath d='M24,70 l12,1.2 l5,8' stroke-width='4.9' stroke-linejoin='round' /%3E%3Cpath d='M24,70 l10,1' stroke='%23008' /%3E%3C/g%3E%3Cg clip-path='url(%23head)'%3E%3Crect width='100%25' height='100%25' fill='%23fc8' /%3E%3Cpath d='M16,56 l-8,-5' stroke='%23f80' stroke-width='10' /%3E%3C/g%3E%3C/svg%3E" />
+{{- if ne .Success ""}}
+		<div>Your new URL is <a href="{{.Success}}">{{.Success}}</a></div>
+{{- else}}
+		<form action="?" method="post">
+			<label for="url">Enter URL:</label><input type="text" name="url" id="url" placeholder="http://www.example.com" value="{{.URL}}" />{{if ne .URLError ""}}<span class="error">{{.URLError}}</span>{{end}}<br />
+			<label for="alias">Specify Alias?:</label><input type="checkbox" id="alias" {{if ne .Key ""}}checked="checked" {{end}}/><input type="text" name="key" placeholder="Alias" value="{{.Key}}" />{{if ne .KeyError ""}}<span class="error">{{.KeyError}}</span>{{end}}<br />
+			<input type="submit" value="Shorten!" />
+		</form>
+{{- end}}
+	</body>
+</html>
