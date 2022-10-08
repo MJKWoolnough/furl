@@ -62,15 +62,18 @@ Unprocessable Entity if the key is invalid.
 POST / - The root can be used to add urls to the store with a generated key.
 The URL must be specified in the POST body as per the specification below.
 
-POST /[key] - Will attempt to create the specified path with the URL provided
-as below. If the key is invalid, will respond with 422 Unprocessable Entity.
-This method cannot be used on existing keys.
+POST /[key] - Will attempt to create the specified path with the URL provided as
+below. If the key is invalid, will respond with 422 Unprocessable Entity. This
+method cannot be used on existing keys.
 
 The URL for the POST methods can be provided in a few content types:
-application/json: {"url": "URL HERE"}
-text/xml: <furl><url>URL HERE</url></furl>
-application/x-www-form-urlencoded: url=URL+HERE
+application/json: {"key": "KEY HERE", "url": "URL HERE"}
+text/xml:<furl><key>KEY HERE</key><url>URL HERE</url></furl>
+application/x-www-form-urlencoded: key=KEY+HERE&url=URL+HERE
 text/plain: URL HERE
+
+For the json, xml, and form content types, the key can be ommitted if it has
+been supplied in the path or if the key is to be generated.
 
 The response type will be determined by the POST content type:
 application/json: {"key": "KEY HERE", "url": "URL HERE"}
@@ -142,7 +145,9 @@ or simply reject the suggested key.
 ```go
 func MemStore(urls map[string]string) Option
 ```
-The MemStore option allows setting a custom filled map of keys -> urls.
+The MemStore option allows setting a custom filled map of keys -> urls. The
+passed map should not be accessed by anything other than Furl until Furl is no
+longer is use.
 
 NB: Neither the keys or URLs are checked to be valid.
 
