@@ -111,7 +111,7 @@ func writeError(w http.ResponseWriter, status int, contentType, err string) {
 	var format string
 	switch contentType {
 	case "text/json", "application/json":
-		format = "{\"error\": %q}"
+		format = "{\"error\":%q}"
 	case "text/xml", "application/xml":
 		format = "<furl><error>%s</error></furl>"
 	default:
