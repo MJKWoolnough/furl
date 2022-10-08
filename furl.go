@@ -116,10 +116,13 @@ func New(opts ...Option) *Furl {
 //               existing keys.
 //
 // The URL for the POST methods can be provided in a few content types:
-// application/json:                  {"url": "URL HERE"}
-// text/xml:                          <furl><url>URL HERE</url></furl>
-// application/x-www-form-urlencoded: url=URL+HERE
+// application/json:                  {"key": "KEY HERE", "url": "URL HERE"}
+// text/xml:                          <furl><key>KEY HERE</key><url>URL HERE</url></furl>
+// application/x-www-form-urlencoded: key=KEY+HERE&url=URL+HERE
 // text/plain:                        URL HERE
+//
+// For the json, xml, and form content types, the key can be ommitted if it has
+// been supplied in the path or if the key is to be generated.
 //
 // The response type will be determined by the POST content type:
 // application/json: {"key": "KEY HERE", "url": "URL HERE"}
@@ -185,6 +188,7 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		err = xml.NewDecoder(r.Body).Decode(&data)
 	case "application/x-www-form-urlencoded":
 		err = r.ParseForm()
+		data.Key = r.PostForm.Get("key")
 		data.URL = r.PostForm.Get("url")
 		contentType = "text/html"
 	case "text/plain":
@@ -204,7 +208,9 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, contentType, invalidURL)
 		return
 	}
-	data.Key = path.Base("/" + r.URL.Path)
+	if data.Key == "" {
+		data.Key = path.Base("/" + r.URL.Path)
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if data.Key == "" || data.Key == "/" || data.Key == "." || data.Key == ".." {
