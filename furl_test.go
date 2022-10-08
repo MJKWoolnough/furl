@@ -97,7 +97,7 @@ func TestPostBasic(t *testing.T) {
 			Body:        "ftp://google.com",
 			ContentType: "unknown",
 			Response:    unrecognisedContentType,
-			Status:      http.StatusBadRequest,
+			Status:      http.StatusUnsupportedMediaType,
 		},
 		{
 			Body:        "ftp://google.com",
