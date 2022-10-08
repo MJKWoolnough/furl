@@ -28,4 +28,5 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 }
 
 func (f *Furl) options(w http.ResponseWriter) {
+	w.Header().Add("Allow", "OPTIONS, GET, HEAD, POST")
 }
