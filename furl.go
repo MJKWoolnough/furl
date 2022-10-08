@@ -10,6 +10,12 @@ type Furl struct {
 	urls map[string]string
 }
 
+func New() *Furl {
+	return &Furl{
+		urls: make(map[string]string),
+	}
+}
+
 func (f *Furl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
