@@ -57,7 +57,7 @@ func (f *Furl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		f.post(w, r)
 	case http.MethodOptions:
-		f.options(w)
+		f.options(w, r)
 	}
 }
 
@@ -76,6 +76,18 @@ func (f *Furl) get(w http.ResponseWriter, r *http.Request) {
 func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 }
 
-func (f *Furl) options(w http.ResponseWriter) {
-	w.Header().Add("Allow", "OPTIONS, GET, HEAD, POST")
+func (f *Furl) options(w http.ResponseWriter, r *http.Request) {
+	key := path.Base(r.URL.Path)
+	if key == "" {
+		w.Header().Add("Allow", "OPTIONS, POST")
+		return
+	}
+	f.mu.RLock()
+	_, ok := f.urls[key]
+	f.mu.RUnlock()
+	if ok {
+		w.Header().Add("Allow", "OPTIONS, GET, HEAD")
+	} else {
+		w.Header().Add("Allow", "OPTIONS, POST")
+	}
 }
