@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"flag"
 	"fmt"
+	"html/template"
 	"net"
 	"net/http"
 	"os"
@@ -13,6 +15,9 @@ import (
 
 	"vimagination.zapto.org/furl"
 )
+
+//go:embed index.tmpl
+var index string
 
 func main() {
 	if err := run(); err != nil {
@@ -51,9 +56,15 @@ func (w *wrappedResponseWriter) Write(p []byte) (int, error) {
 	}
 }
 
+type tmplVars struct {
+	Success, URL, URLError, Key, KeyError string
+}
+
 func run() error {
+	tmpl := template.Must(template.New("").Parse(index))
 	file := flag.String("f", "", "filename to store key:url map data")
 	port := flag.Int("p", 8080, "port for server to listen on")
+	serverURL := flag.String("s", "", "base server url. e.g. http://furl.com/")
 	flag.Parse()
 
 	furlParams := []furl.Option{
@@ -79,23 +90,30 @@ func run() error {
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodGet && r.URL.Path == "/" {
-				// serve index
+				tmpl.Execute(w, tmplVars{})
 			} else if r.Method == http.MethodPost && r.URL.Path == "/" && r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
 				wr := wrappedResponseWriter{
 					ResponseWriter: w,
 					code:           http.StatusOK,
 				}
 				f.ServeHTTP(&wr, r)
+				tv := tmplVars{
+					Key: r.PostForm.Get("key"),
+					URL: r.PostForm.Get("url"),
+				}
 				switch wr.code {
 				case http.StatusOK:
-					// generate page with new key
+					tv.Success = *serverURL + wr.Buffer.String()
 				case http.StatusBadRequest:
-					// generate page with URL invalid error
+					tv.URLError = "Invalid URL"
 				case http.StatusUnprocessableEntity:
-					// generate page with Key invalid error
+					tv.KeyError = "Invalid Alias"
 				case http.StatusMethodNotAllowed:
-					// generate page with Key exists error
+					tv.KeyError = "Alias Exists"
+				default:
+					return
 				}
+				tmpl.Execute(w, tv)
 			} else {
 				f.ServeHTTP(w, r)
 			}
