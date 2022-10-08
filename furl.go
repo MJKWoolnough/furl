@@ -130,10 +130,10 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, invalidURL, http.StatusBadRequest)
 		return
 	}
-	data.Key = path.Base(r.URL.Path)
+	data.Key = path.Base("/" + r.URL.Path)
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if data.Key == "" {
+	if data.Key == "" || data.Key == "/" || data.Key == "." || data.Key == ".." {
 	Loop:
 		for idLength := f.keyLength; ; idLength++ {
 			keyBytes := make([]byte, idLength)
