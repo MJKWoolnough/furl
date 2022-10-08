@@ -17,6 +17,7 @@ const (
 	defaultKeyLength = 6
 	defaultRetries   = 100
 	maxURLLength     = 2048
+	maxKeyLength     = 2048
 )
 
 func allValid(_ string) bool {
@@ -136,9 +137,13 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 					break Loop
 				}
 			}
+			if idLength == maxKeyLength {
+				http.Error(w, "failed to generate key", http.StatusInternalServerError)
+				return
+			}
 		}
 	} else {
-		if !f.keyValidator(url.Key) {
+		if len(url.Key) > maxKeyLength || !f.keyValidator(url.Key) {
 			http.Error(w, "invalid key", http.StatusBadRequest)
 			return
 		}
