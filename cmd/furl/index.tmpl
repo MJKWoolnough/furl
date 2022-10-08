@@ -14,7 +14,7 @@
 		<form action="?" method="post">
 			<label for="url">Enter URL:</label><input type="text" name="url" id="url" placeholder="http://www.example.com" value="{{.URL}}" />{{if ne .URLError ""}}<span class="error">{{.URLError}}</span>{{end}}<br />
 			<label for="alias">Specify Alias?:</label><input type="checkbox" id="alias" {{if ne .Key ""}}checked="checked" {{end}}/><input type="text" name="key" placeholder="Alias" value="{{.Key}}" />{{if ne .KeyError ""}}<span class="error">{{.KeyError}}</span>{{end}}<br />
-			<input type="submit" value="Shorten!" />
+			<input type="submit" value="Furl!" />
 		</form>
 {{- end}}
 	</body>
