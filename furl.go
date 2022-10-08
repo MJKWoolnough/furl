@@ -178,14 +178,15 @@ func (f *Furl) options(w http.ResponseWriter, r *http.Request) {
 	key := path.Base(r.URL.Path)
 	if key == "" {
 		w.Header().Add("Allow", optionsPost)
-		return
-	}
-	f.mu.RLock()
-	_, ok := f.urls[key]
-	f.mu.RUnlock()
-	if ok {
-		w.Header().Add("Allow", optionsGetHead)
 	} else {
-		w.Header().Add("Allow", optionsPost)
+		f.mu.RLock()
+		_, ok := f.urls[key]
+		f.mu.RUnlock()
+		if ok {
+			w.Header().Add("Allow", optionsGetHead)
+		} else {
+			w.Header().Add("Allow", optionsPost)
+		}
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
