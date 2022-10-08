@@ -2,6 +2,7 @@ package furl
 
 import (
 	"net/http"
+	"path"
 	"sync"
 )
 
@@ -61,6 +62,15 @@ func (f *Furl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (f *Furl) get(w http.ResponseWriter, r *http.Request) {
+	key := path.Base(r.URL.Path)
+	f.mu.RLock()
+	url, ok := f.urls[key]
+	f.mu.RUnlock()
+	if ok {
+		http.Redirect(w, r, url, http.StatusMovedPermanently)
+	} else {
+		http.NotFound(w, r)
+	}
 }
 
 func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
