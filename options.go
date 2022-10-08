@@ -65,7 +65,9 @@ func CollisionRetries(retries uint) Option {
 	}
 }
 
-// The MemStore option allows setting a custom filled map of keys -> urls.
+// The MemStore option allows setting a custom filled map of keys -> urls. The
+// passed map should not be accessed by anything other than Furl until Furl is
+// no longer is use.
 //
 // NB: Neither the keys or URLs are checked to be valid.
 func MemStore(urls map[string]string) Option {
