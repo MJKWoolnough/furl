@@ -1,3 +1,5 @@
+// Package Furl provides a drop-in http.Handler that provides short url
+// redirects for longer URLs.
 package furl
 
 import (
@@ -50,6 +52,8 @@ func save(_, _ string) error {
 	return nil
 }
 
+// The Furl type represents a keystore of URLs to either generated or supploed
+// keys.
 type Furl struct {
 	urlValidator, keyValidator func(string) bool
 	keyLength, retries         uint
@@ -60,6 +64,24 @@ type Furl struct {
 	urls map[string]string
 }
 
+// The New function creates a new instance of Furl, with the following defaults
+// that can be changed by adding Option params.
+//
+// urlValidator: By default all strings are treated as valid URLs, this can be
+// changed by using the URLValidator Option.
+//
+// keyValidator: By default all strings are treated as valid Keys, this can be
+// changed by using the KeyValidator Option.
+//
+// keyLength: The default length of generated keys (before base64 encoding) is
+// 6 and can be changed by using the KeyLength Option.
+//
+// retries: The default number of retries the key generator will before
+// increasing the key length is 100 and can be changed by using the
+// CollisionRetries Option.
+//
+// save: By default no data is permanently stored and this can be changed by
+// using the IOStore Option.
 func New(opts ...Option) *Furl {
 	f := &Furl{
 		urlValidator: allValid,
@@ -80,6 +102,32 @@ func New(opts ...Option) *Furl {
 	return f
 }
 
+// The ServeHTTP method satifies the http.Handler interface and provides the
+// following endpoints:
+// GET /[key] -  Will redirect the call to the associated URL if it exists, or
+//               will return 404 Not Found if it doesn't exists and 422
+//               Unprocessable Entity if the key is invalid.
+// POST / -      The root can be used to add urls to the store with a generated
+//               key. The URL must be specified in the POST body as per the
+//               specification below.
+// POST /[key] - Will attempt to create the specified path with the URL
+//               provided as below. If the key is invalid, will respond with
+//               422 Unprocessable Entity. This method cannot be used on
+//               existing keys.
+//
+// The URL for the POST methods can be provided in a few content types:
+// application/json:                  {"url": "URL HERE"}
+// text/xml:                          <furl><url>URL HERE</url></furl>
+// application/x-www-form-urlencoded: url=URL+HERE
+// text/plain:                        URL HERE
+//
+// The response type will be determined by the POST content type:
+// application/json: {"key": "KEY HERE", "url": "URL HERE"}
+// text/xml:         <furl><key>KEY HERE</key><url>URL HERE</url></furl>
+// text/plain:       KEY HERE
+//
+// For application/x-www-form-urlencoded, the content type of the return will
+// be text/html and the response will match that of text/plain.
 func (f *Furl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
