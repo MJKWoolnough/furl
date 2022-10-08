@@ -134,7 +134,7 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		_, err = io.Copy(&sb, r.Body)
 		data.URL = sb.String()
 	default:
-		http.Error(w, unrecognisedContentType, http.StatusBadRequest)
+		http.Error(w, unrecognisedContentType, http.StatusUnsupportedMediaType)
 		return
 	}
 	w.Header().Set("Content-Type", contentType)
