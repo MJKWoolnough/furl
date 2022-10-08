@@ -52,7 +52,7 @@ func save(_, _ string) error {
 	return nil
 }
 
-// The Furl type represents a keystore of URLs to either generated or supploed
+// The Furl type represents a keystore of URLs to either generated or supplied
 // keys.
 type Furl struct {
 	urlValidator, keyValidator func(string) bool
