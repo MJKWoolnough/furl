@@ -44,19 +44,19 @@ func IOStore(rw io.ReadWriter) Option {
 		f.urls = make(map[string]string)
 		r := byteio.StickyLittleEndianReader{Reader: rw}
 		for {
-			key := r.ReadStringX()
+			key := r.ReadString16()
 			if key == "" {
 				break
 			}
-			f.urls[key] = r.ReadStringX()
+			f.urls[key] = r.ReadString16()
 		}
 		if r.Err != nil && r.Err != io.EOF {
 			panic(r.Err)
 		}
 		w := byteio.StickyLittleEndianWriter{Writer: rw}
 		f.save = func(key string, url string) error {
-			w.WriteStringX(key)
-			w.WriteStringX(url)
+			w.WriteString16(key)
+			w.WriteString16(url)
 			if w.Err == nil {
 				if f, ok := rw.(interface{ Sync() error }); ok {
 					w.Err = f.Sync()
