@@ -32,15 +32,21 @@ type Furl struct {
 	urls map[string]string
 }
 
-func New() *Furl {
-	return &Furl{
+func New(opts ...Option) *Furl {
+	f := &Furl{
 		urlValidator: allValid,
 		keyValidator: allValid,
 		keyLength:    defaultKeyLength,
 		retries:      defaultRetries,
 		save:         save,
-		urls:         make(map[string]string),
 	}
+	for _, o := range opts {
+		o(f)
+	}
+	if f.urls == nil {
+		f.urls = make(map[string]string)
+	}
+	return f
 }
 
 func (f *Furl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
