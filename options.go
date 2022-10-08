@@ -2,6 +2,7 @@ package furl
 
 import (
 	"io"
+	"math/rand"
 
 	"vimagination.zapto.org/byteio"
 )
@@ -63,5 +64,11 @@ func IOStore(rw io.ReadWriter) Option {
 			}
 			return w.Err
 		}
+	}
+}
+
+func RandomSource(source rand.Source) Option {
+	return func(f *Furl) {
+		f.rand = rand.New(source)
 	}
 }
