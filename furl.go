@@ -1,9 +1,14 @@
 package furl
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"encoding/xml"
+	"io"
 	"math/rand"
 	"net/http"
 	"path"
+	"strings"
 	"sync"
 	"time"
 )
@@ -81,6 +86,77 @@ func (f *Furl) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
+	var (
+		url struct {
+			Key string `json:"key" xml:"key"`
+			URL string `json:"url" xml:"url"`
+		}
+		err error
+	)
+	contentType := r.Header.Get("Content-Type")
+	switch contentType {
+	case "text/json", "application/json":
+		json.NewDecoder(r.Body).Decode(&url)
+		contentType = "json"
+	case "text/xml":
+		err = xml.NewDecoder(r.Body).Decode(&url)
+		contentType = "xml"
+	case "application/x-www-form-urlencoded":
+		err = r.ParseForm()
+		url.URL = r.PostForm.Get("url")
+		contentType = "html"
+	case "text/plain":
+		var sb strings.Builder
+		_, err = io.Copy(&sb, r.Body)
+		url.URL = sb.String()
+		contentType = "plain"
+	default:
+		http.Error(w, "unrecognised content-type", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, "failed to read request", http.StatusBadRequest)
+		return
+	}
+	if len(url.URL) > maxURLLength || url.URL == "" || !f.urlValidator(url.URL) {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+	url.Key = path.Base(r.URL.Path)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if url.Key == "" {
+	Loop:
+		for idLength := f.keyLength; ; idLength++ {
+			keyBytes := make([]byte, idLength)
+			for i := uint(0); i < f.retries; i++ {
+				f.rand.Read(keyBytes) // NB: will never error
+				url.Key = base64.RawURLEncoding.EncodeToString(keyBytes)
+				if _, ok := f.urls[url.Key]; !ok && f.keyValidator(url.Key) {
+					break Loop
+				}
+			}
+		}
+	} else {
+		if !f.keyValidator(url.Key) {
+			http.Error(w, "invalid key", http.StatusBadRequest)
+			return
+		}
+		if _, ok := f.urls[url.Key]; ok {
+			http.Error(w, "key exists", http.StatusMethodNotAllowed)
+			return
+		}
+	}
+	f.urls[url.Key] = url.URL
+	f.save(url.Key, url.URL)
+	switch contentType {
+	case "json":
+		json.NewEncoder(w).Encode(url)
+	case "xml":
+		json.NewEncoder(w).Encode(url)
+	case "html", "text":
+		io.WriteString(w, url.Key)
+	}
 }
 
 func (f *Furl) options(w http.ResponseWriter, r *http.Request) {
