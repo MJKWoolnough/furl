@@ -31,6 +31,12 @@ const (
 	optionsGetHead = "OPTIONS, GET, HEAD"
 )
 
+var xmlStart = xml.StartElement{
+	Name: xml.Name{
+		Local: "furl",
+	},
+}
+
 func allValid(_ string) bool {
 	return true
 }
@@ -107,7 +113,7 @@ func writeError(w http.ResponseWriter, status int, contentType, err string) {
 	case "text/json", "application/json":
 		format = "{\"error\": %q}"
 	case "text/xml", "application/xml":
-		format = "<error>%s</error>"
+		format = "<furl><error>%s</error></furl>"
 	default:
 		format = "%s"
 	}
@@ -185,7 +191,7 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	case "text/json", "application/json":
 		json.NewEncoder(w).Encode(data)
 	case "text/xml", "application/xml":
-		json.NewEncoder(w).Encode(data)
+		xml.NewEncoder(w).EncodeElement(data, xmlStart)
 	case "text/html", "text/plain":
 		io.WriteString(w, data.Key)
 	}
