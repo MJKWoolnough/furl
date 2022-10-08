@@ -98,7 +98,7 @@ func (f *Furl) get(w http.ResponseWriter, r *http.Request) {
 
 func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	var (
-		url struct {
+		data struct {
 			Key string `json:"key" xml:"key"`
 			URL string `json:"url" xml:"url"`
 		}
@@ -107,19 +107,19 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	switch contentType {
 	case "text/json", "application/json":
-		json.NewDecoder(r.Body).Decode(&url)
+		json.NewDecoder(r.Body).Decode(&data)
 		contentType = "json"
 	case "text/xml":
-		err = xml.NewDecoder(r.Body).Decode(&url)
+		err = xml.NewDecoder(r.Body).Decode(&data)
 		contentType = "xml"
 	case "application/x-www-form-urlencoded":
 		err = r.ParseForm()
-		url.URL = r.PostForm.Get("url")
+		data.URL = r.PostForm.Get("url")
 		contentType = "html"
 	case "text/plain":
 		var sb strings.Builder
 		_, err = io.Copy(&sb, r.Body)
-		url.URL = sb.String()
+		data.URL = sb.String()
 		contentType = "plain"
 	default:
 		http.Error(w, unrecognisedContentType, http.StatusBadRequest)
@@ -129,21 +129,21 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, failedReadRequest, http.StatusBadRequest)
 		return
 	}
-	if len(url.URL) > maxURLLength || url.URL == "" || !f.urlValidator(url.URL) {
+	if len(data.URL) > maxURLLength || data.URL == "" || !f.urlValidator(data.URL) {
 		http.Error(w, invalidURL, http.StatusBadRequest)
 		return
 	}
-	url.Key = path.Base(r.URL.Path)
+	data.Key = path.Base(r.URL.Path)
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if url.Key == "" {
+	if data.Key == "" {
 	Loop:
 		for idLength := f.keyLength; ; idLength++ {
 			keyBytes := make([]byte, idLength)
 			for i := uint(0); i < f.retries; i++ {
 				f.rand.Read(keyBytes) // NB: will never error
-				url.Key = base64.RawURLEncoding.EncodeToString(keyBytes)
-				if _, ok := f.urls[url.Key]; !ok && f.keyValidator(url.Key) {
+				data.Key = base64.RawURLEncoding.EncodeToString(keyBytes)
+				if _, ok := f.urls[data.Key]; !ok && f.keyValidator(data.Key) {
 					break Loop
 				}
 			}
@@ -153,24 +153,24 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		if len(url.Key) > maxKeyLength || !f.keyValidator(url.Key) {
+		if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
 			http.Error(w, invalidKey, http.StatusBadRequest)
 			return
 		}
-		if _, ok := f.urls[url.Key]; ok {
+		if _, ok := f.urls[data.Key]; ok {
 			http.Error(w, keyExists, http.StatusMethodNotAllowed)
 			return
 		}
 	}
-	f.urls[url.Key] = url.URL
-	f.save(url.Key, url.URL)
+	f.urls[data.Key] = data.URL
+	f.save(data.Key, data.URL)
 	switch contentType {
 	case "json":
-		json.NewEncoder(w).Encode(url)
+		json.NewEncoder(w).Encode(data)
 	case "xml":
-		json.NewEncoder(w).Encode(url)
+		json.NewEncoder(w).Encode(data)
 	case "html", "text":
-		io.WriteString(w, url.Key)
+		io.WriteString(w, data.Key)
 	}
 }
 
