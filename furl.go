@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"path"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -43,10 +42,6 @@ func allValid(_ string) bool {
 	return true
 }
 
-func save(_, _ string) error {
-	return nil
-}
-
 type httpError struct {
 	Code  int
 	Error string
@@ -72,11 +67,8 @@ var (
 type Furl struct {
 	urlValidator, keyValidator func(string) bool
 	keyLength, retries         uint
-	save                       func(string, string) error
 	rand                       *rand.Rand
-
-	mu   sync.RWMutex
-	urls map[string]string
+	store                      Store
 }
 
 // The New function creates a new instance of Furl, with the following defaults
@@ -103,13 +95,12 @@ func New(opts ...Option) *Furl {
 		keyValidator: allValid,
 		keyLength:    defaultKeyLength,
 		retries:      defaultRetries,
-		save:         save,
 	}
 	for _, o := range opts {
 		o(f)
 	}
-	if f.urls == nil {
-		f.urls = make(map[string]string)
+	if f.store == nil {
+		f.store = NewStore()
 	}
 	if f.rand == nil {
 		f.rand = rand.New(rand.NewSource(time.Now().UnixMicro()))
@@ -163,9 +154,7 @@ func (f *Furl) get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, invalidKey, http.StatusUnprocessableEntity)
 		return
 	}
-	f.mu.RLock()
-	url, ok := f.urls[key]
-	f.mu.RUnlock()
+	url, ok := f.store.Get(key)
 	if ok {
 		http.Redirect(w, r, url, http.StatusMovedPermanently)
 	} else {
@@ -229,17 +218,13 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		data.Key = path.Base("/" + r.URL.Path)
 	}
 	var herr *httpError
-	f.mu.Lock()
-	if data.Key == "" || data.Key == "/" || data.Key == "." || data.Key == ".." {
-		herr = f.genKey(&data)
-	} else {
-		herr = f.setKey(&data)
-	}
-	if herr == nil {
-		f.urls[data.Key] = data.URL
-		f.save(data.Key, data.URL)
-	}
-	f.mu.Unlock()
+	f.store.Tx(func(tx Tx) {
+		if data.Key == "" || data.Key == "/" || data.Key == "." || data.Key == ".." {
+			herr = f.genKey(tx, &data)
+		} else {
+			herr = f.setKey(tx, &data)
+		}
+	})
 	if herr != nil {
 		writeError(w, herr.Code, contentType, herr.Error)
 		return
@@ -254,14 +239,14 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (f *Furl) genKey(data *keyURL) *httpError {
+func (f *Furl) genKey(tx Tx, data *keyURL) *httpError {
 Loop:
 	for idLength := f.keyLength; ; idLength++ {
 		keyBytes := make([]byte, idLength)
 		for i := uint(0); i < f.retries; i++ {
 			f.rand.Read(keyBytes) // NB: will never error
 			data.Key = base64.RawURLEncoding.EncodeToString(keyBytes)
-			if _, ok := f.urls[data.Key]; !ok && f.keyValidator(data.Key) {
+			if ok := tx.Has(data.Key); !ok && f.keyValidator(data.Key) {
 				break Loop
 			}
 		}
@@ -269,16 +254,18 @@ Loop:
 			return failedKeyGenerationError
 		}
 	}
+	tx.Set(data.Key, data.URL)
 	return nil
 }
 
-func (f *Furl) setKey(data *keyURL) *httpError {
+func (f *Furl) setKey(tx Tx, data *keyURL) *httpError {
 	if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
 		return invalidKeyError
 	}
-	if _, ok := f.urls[data.Key]; ok {
+	if ok := tx.Has(data.Key); ok {
 		return keyExistsError
 	}
+	tx.Set(data.Key, data.URL)
 	return nil
 }
 
@@ -290,9 +277,7 @@ func (f *Furl) options(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, invalidKey, http.StatusUnprocessableEntity)
 		return
 	} else {
-		f.mu.RLock()
-		_, ok := f.urls[key]
-		f.mu.RUnlock()
+		_, ok := f.store.Get(key)
 		if ok {
 			w.Header().Add("Allow", optionsGetHead)
 		} else {

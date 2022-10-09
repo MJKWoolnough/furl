@@ -7,12 +7,14 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 
+	"vimagination.zapto.org/byteio"
 	"vimagination.zapto.org/furl"
 )
 
@@ -82,7 +84,29 @@ func run() error {
 			return fmt.Errorf("error opening database file (%s): %w", *file, err)
 		}
 		defer f.Close()
-		furlParams = append(furlParams, furl.IOStore(f))
+		data := make(map[string]string)
+		lr := byteio.StickyLittleEndianReader{Reader: f}
+		for {
+			key := lr.ReadString16()
+			if key == "" {
+				break
+			}
+			data[key] = lr.ReadString16()
+		}
+		if lr.Err != nil && lr.Err != io.EOF {
+			return fmt.Errorf("error reading store data: %w", lr.Err)
+		}
+		lw := byteio.StickyLittleEndianWriter{Writer: f}
+		furlParams = append(furlParams, furl.SetStore(furl.NewStore(furl.Data(data), furl.Save(func(key, url string) {
+			lw.WriteString16(key)
+			lw.WriteString16(url)
+			if lw.Err == nil {
+				f.Sync()
+			}
+			if lw.Err != nil {
+				panic(lw.Err)
+			}
+		}))))
 	}
 	l, err := net.ListenTCP("tcp", &net.TCPAddr{Port: *port})
 	if err != nil {

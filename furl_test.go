@@ -8,9 +8,9 @@ import (
 )
 
 func TestOptions(t *testing.T) {
-	f := New(MemStore(map[string]string{
+	f := New(SetStore(NewStore(Data(map[string]string{
 		"AAA": "http://www.google.com",
-	}))
+	}))))
 	for n, test := range [...]struct {
 		Path, Response string
 	}{
@@ -38,9 +38,9 @@ func TestOptions(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	f := New(MemStore(map[string]string{
+	f := New(SetStore(NewStore(Data(map[string]string{
 		"AAA": "http://www.google.com",
-	}))
+	}))))
 	for n, test := range [...]struct {
 		Path, Location string
 		Status         int
@@ -86,9 +86,9 @@ func (nonrand) Seed(_ int64) {}
 
 func TestPost(t *testing.T) {
 	rs := nonrand{0, 0, 1, 2}
-	f := New(MemStore(map[string]string{
+	f := New(SetStore(NewStore(Data(map[string]string{
 		"AA": "http://www.google.com",
-	}), RandomSource(&rs), KeyLength(1), URLValidator(HTTPURL), KeyValidator(func(key string) bool {
+	}))), RandomSource(&rs), KeyLength(1), URLValidator(HTTPURL), KeyValidator(func(key string) bool {
 		return key != "ABC"
 	}))
 	for n, test := range [...]struct {

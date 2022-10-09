@@ -1,11 +1,8 @@
 package furl
 
 import (
-	"io"
 	"math/rand"
 	"net/url"
-
-	"vimagination.zapto.org/byteio"
 )
 
 // The Option type is used to specify optional params to the New function call
@@ -65,54 +62,9 @@ func CollisionRetries(retries uint) Option {
 	}
 }
 
-// The MemStore option allows setting a custom filled map of keys -> urls. The
-// passed map should not be accessed by anything other than Furl until Furl is
-// no longer is use.
-//
-// NB: Neither the keys or URLs are checked to be valid.
-func MemStore(urls map[string]string) Option {
+func SetStore(s Store) Option {
 	return func(f *Furl) {
-		f.urls = urls
-	}
-}
-
-// The IOStore sets io.ReadWriter to load and save keys and URLs to.
-//
-// Each key:url pair is stored sequentially and according to the following
-// format:
-// struct {
-//	KeyLength uint16
-//      Key       [KeyLength]byte
-//      URLLength uint16
-//      URL       [URLLength]byte
-// }
-//
-// NB: The uint16s are store in LittleEndian format.
-func IOStore(rw io.ReadWriter) Option {
-	return func(f *Furl) {
-		f.urls = make(map[string]string)
-		r := byteio.StickyLittleEndianReader{Reader: rw}
-		for {
-			key := r.ReadString16()
-			if key == "" {
-				break
-			}
-			f.urls[key] = r.ReadString16()
-		}
-		if r.Err != nil && r.Err != io.EOF {
-			panic(r.Err)
-		}
-		w := byteio.StickyLittleEndianWriter{Writer: rw}
-		f.save = func(key string, url string) error {
-			w.WriteString16(key)
-			w.WriteString16(url)
-			if w.Err == nil {
-				if f, ok := rw.(interface{ Sync() error }); ok {
-					w.Err = f.Sync()
-				}
-			}
-			return w.Err
-		}
+		f.store = s
 	}
 }
 
