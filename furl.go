@@ -47,6 +47,26 @@ func save(_, _ string) error {
 	return nil
 }
 
+type httpError struct {
+	Code  int
+	Error string
+}
+
+var (
+	failedKeyGenerationError = &httpError{
+		Code:  http.StatusInternalServerError,
+		Error: failedKeyGeneration,
+	}
+	invalidKeyError = &httpError{
+		Code:  http.StatusUnprocessableEntity,
+		Error: invalidKey,
+	}
+	keyExistsError = &httpError{
+		Code:  http.StatusMethodNotAllowed,
+		Error: keyExists,
+	}
+)
+
 // The Furl type represents a keystore of URLs to either generated or supplied
 // keys.
 type Furl struct {
@@ -167,13 +187,15 @@ func writeError(w http.ResponseWriter, status int, contentType, err string) {
 	fmt.Fprintf(w, format, err)
 }
 
+type keyURL struct {
+	Key string `json:"key" xml:"key"`
+	URL string `json:"url" xml:"url"`
+}
+
 func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	var (
-		data struct {
-			Key string `json:"key" xml:"key"`
-			URL string `json:"url" xml:"url"`
-		}
-		err error
+		data keyURL
+		err  error
 	)
 	contentType := r.Header.Get("Content-Type")
 	switch contentType {
@@ -206,36 +228,22 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	if data.Key == "" {
 		data.Key = path.Base("/" + r.URL.Path)
 	}
+	var herr *httpError
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	if data.Key == "" || data.Key == "/" || data.Key == "." || data.Key == ".." {
-	Loop:
-		for idLength := f.keyLength; ; idLength++ {
-			keyBytes := make([]byte, idLength)
-			for i := uint(0); i < f.retries; i++ {
-				f.rand.Read(keyBytes) // NB: will never error
-				data.Key = base64.RawURLEncoding.EncodeToString(keyBytes)
-				if _, ok := f.urls[data.Key]; !ok && f.keyValidator(data.Key) {
-					break Loop
-				}
-			}
-			if idLength == maxKeyLength {
-				writeError(w, http.StatusInternalServerError, contentType, failedKeyGeneration)
-				return
-			}
-		}
+		herr = f.genKey(&data)
 	} else {
-		if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
-			writeError(w, http.StatusUnprocessableEntity, contentType, invalidKey)
-			return
-		}
-		if _, ok := f.urls[data.Key]; ok {
-			writeError(w, http.StatusMethodNotAllowed, contentType, keyExists)
-			return
-		}
+		herr = f.setKey(&data)
 	}
-	f.urls[data.Key] = data.URL
-	f.save(data.Key, data.URL)
+	if herr == nil {
+		f.urls[data.Key] = data.URL
+		f.save(data.Key, data.URL)
+	}
+	f.mu.Unlock()
+	if herr != nil {
+		writeError(w, herr.Code, contentType, herr.Error)
+		return
+	}
 	switch contentType {
 	case "text/json", "application/json":
 		json.NewEncoder(w).Encode(data)
@@ -244,6 +252,34 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	case "text/html", "text/plain":
 		io.WriteString(w, data.Key)
 	}
+}
+
+func (f *Furl) genKey(data *keyURL) *httpError {
+Loop:
+	for idLength := f.keyLength; ; idLength++ {
+		keyBytes := make([]byte, idLength)
+		for i := uint(0); i < f.retries; i++ {
+			f.rand.Read(keyBytes) // NB: will never error
+			data.Key = base64.RawURLEncoding.EncodeToString(keyBytes)
+			if _, ok := f.urls[data.Key]; !ok && f.keyValidator(data.Key) {
+				break Loop
+			}
+		}
+		if idLength == maxKeyLength {
+			return failedKeyGenerationError
+		}
+	}
+	return nil
+}
+
+func (f *Furl) setKey(data *keyURL) *httpError {
+	if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
+		return invalidKeyError
+	}
+	if _, ok := f.urls[data.Key]; ok {
+		return keyExistsError
+	}
+	return nil
 }
 
 func (f *Furl) options(w http.ResponseWriter, r *http.Request) {
