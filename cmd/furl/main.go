@@ -49,11 +49,11 @@ func (w *wrappedResponseWriter) WriteHeader(code int) {
 
 func (w *wrappedResponseWriter) Write(p []byte) (int, error) {
 	switch w.code {
-	case http.StatusOK:
+	case http.StatusOK: // Created a key, store the key
 		return w.Buffer.Write(p)
-	case http.StatusBadRequest, http.StatusUnprocessableEntity, http.StatusMethodNotAllowed:
+	case http.StatusBadRequest, http.StatusUnprocessableEntity, http.StatusMethodNotAllowed: // Don't need the reponse from these, just the code
 		return len(p), nil
-	default:
+	default: // for any other code, we write the code the first time, and forward the write buf
 		if w.code != 0 {
 			w.ResponseWriter.WriteHeader(w.code)
 			w.code = 0
@@ -78,7 +78,7 @@ func run() error {
 		furl.KeyValidator(keyValidator),
 	}
 
-	if *file != "" {
+	if *file != "" { // if we're loading a file-back store
 		f, err := os.OpenFile(*file, os.O_RDWR|os.O_CREATE, 0o666)
 		if err != nil {
 			return fmt.Errorf("error opening database file (%s): %w", *file, err)
@@ -87,6 +87,20 @@ func run() error {
 		data := make(map[string]string)
 		b := bufio.NewReader(f)
 		var length [2]byte
+
+		/*
+			Each key:url pair is stored sequentially and according to the following format:
+
+			struct {
+				KeyLength uint16
+				Key       [KeyLength]byte
+				URLLength uint16
+				URL       [URLLength]byte
+			}
+
+			The uint16s are store in LittleEndian format.
+		*/
+
 		for {
 			if _, err := io.ReadFull(b, length[:]); err != nil && err != io.EOF {
 				return fmt.Errorf("error reading key length: %w", err)
@@ -147,9 +161,9 @@ func run() error {
 
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodGet && r.URL.Path == "/" {
+			if r.Method == http.MethodGet && r.URL.Path == "/" { // If we're loading the webpage
 				tmpl.Execute(w, tmplVars{})
-			} else if r.Method == http.MethodPost && r.URL.Path == "/" && r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
+			} else if r.Method == http.MethodPost && r.URL.Path == "/" && r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" { // If we're recieving POST data from the webpage
 				wr := wrappedResponseWriter{
 					ResponseWriter: w,
 					code:           http.StatusOK,
@@ -179,6 +193,8 @@ func run() error {
 	}
 
 	go server.Serve(l)
+
+	// wait for SIGINT
 
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, os.Interrupt)

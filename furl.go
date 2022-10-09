@@ -195,13 +195,13 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if data.Key == "" {
-		data.Key = path.Base("/" + r.URL.Path)
+		data.Key = path.Base("/" + r.URL.Path) // see if suggested key in path
 	}
 	var (
 		errCode   int
 		errString string
 	)
-	if data.Key == "" || data.Key == "/" || data.Key == "." || data.Key == ".." {
+	if data.Key == "" || data.Key == "/" || data.Key == "." || data.Key == ".." { // generate key
 		f.store.Tx(func(tx Tx) {
 			for idLength := f.keyLength; ; idLength++ {
 				keyBytes := make([]byte, idLength)
@@ -223,7 +223,7 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	} else if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
 		writeError(w, http.StatusUnprocessableEntity, contentType, invalidKey)
 		return
-	} else {
+	} else { // use suggested key
 		f.store.Tx(func(tx Tx) {
 			if ok := tx.Has(data.Key); ok {
 				errCode = http.StatusMethodNotAllowed
