@@ -87,8 +87,8 @@ type Furl struct {
 // increasing the key length is 100 and can be changed by using the
 // CollisionRetries Option.
 //
-// save: By default no data is permanently stored and this can be changed by
-// using the IOStore Option.
+// store: The default store is an empty map that will not permanently record
+// the data. This can be changed by using the SetStore Option.
 func New(opts ...Option) *Furl {
 	f := &Furl{
 		urlValidator: allValid,
