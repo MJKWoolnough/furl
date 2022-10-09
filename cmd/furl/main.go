@@ -88,7 +88,7 @@ func run() error {
 		b := bufio.NewReader(f)
 		var length [2]byte
 		for {
-			if _, err := io.ReadFull(b, length[:]); err != nil {
+			if _, err := io.ReadFull(b, length[:]); err != nil && err != io.EOF {
 				return fmt.Errorf("error reading key length: %w", err)
 			}
 			keyLength := int(length[0]) | (int(length[1]) << 8)
@@ -99,16 +99,18 @@ func run() error {
 			if _, err = io.ReadFull(b, key); err != nil {
 				return fmt.Errorf("error reading key: %w", err)
 			}
+			if _, err := io.ReadFull(b, length[:]); err != nil && err != io.EOF {
+				return fmt.Errorf("error reading url length: %w", err)
+			}
 			if urlLength := int(length[0]) | (int(length[1]) << 8); urlLength > 0 {
-				if _, err := io.ReadFull(b, length[:]); err != nil {
-					return fmt.Errorf("error reading url length: %w", err)
-				}
 				url := make([]byte, urlLength)
 				if _, err = io.ReadFull(b, url); err != nil {
 					return fmt.Errorf("error reading url: %w", err)
 				}
 				data[string(key)] = string(url)
 			}
+			length[0] = 0
+			length[1] = 0
 		}
 		w := bufio.NewWriter(f)
 		furlParams = append(furlParams, furl.SetStore(furl.NewStore(furl.Data(data), furl.Save(func(key, url string) {
