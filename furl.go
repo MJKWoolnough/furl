@@ -42,26 +42,6 @@ func allValid(_ string) bool {
 	return true
 }
 
-type httpError struct {
-	Code  int
-	Error string
-}
-
-var (
-	failedKeyGenerationError = &httpError{
-		Code:  http.StatusInternalServerError,
-		Error: failedKeyGeneration,
-	}
-	invalidKeyError = &httpError{
-		Code:  http.StatusUnprocessableEntity,
-		Error: invalidKey,
-	}
-	keyExistsError = &httpError{
-		Code:  http.StatusMethodNotAllowed,
-		Error: keyExists,
-	}
-)
-
 // The Furl type represents a keystore of URLs to either generated or supplied
 // keys.
 type Furl struct {
@@ -217,7 +197,10 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	if data.Key == "" {
 		data.Key = path.Base("/" + r.URL.Path)
 	}
-	var herr *httpError
+	var (
+		errCode   int
+		errString string
+	)
 	if data.Key == "" || data.Key == "/" || data.Key == "." || data.Key == ".." {
 		f.store.Tx(func(tx Tx) {
 			for idLength := f.keyLength; ; idLength++ {
@@ -231,24 +214,27 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				if idLength == maxKeyLength {
-					herr = failedKeyGenerationError
+					errCode = http.StatusInternalServerError
+					errString = failedKeyGeneration
 					return
 				}
 			}
 		})
 	} else if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
-		herr = invalidKeyError
+		writeError(w, http.StatusUnprocessableEntity, contentType, invalidKey)
+		return
 	} else {
 		f.store.Tx(func(tx Tx) {
 			if ok := tx.Has(data.Key); ok {
-				herr = keyExistsError
+				errCode = http.StatusMethodNotAllowed
+				errString = keyExists
 			} else {
 				tx.Set(data.Key, data.URL)
 			}
 		})
 	}
-	if herr != nil {
-		writeError(w, herr.Code, contentType, herr.Error)
+	if errCode != 0 {
+		writeError(w, errCode, contentType, errString)
 		return
 	}
 	switch contentType {
