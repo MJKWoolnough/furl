@@ -62,6 +62,9 @@ func CollisionRetries(retries uint) Option {
 	}
 }
 
+// The SetStore options allows for setting both starting data and the options to
+// persist the collected data. See the Store interface and NewStore function for
+// more information about Stores.
 func SetStore(s Store) Option {
 	return func(f *Furl) {
 		f.store = s
