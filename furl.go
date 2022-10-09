@@ -169,7 +169,7 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	switch contentType {
 	case "text/json", "application/json":
-		json.NewDecoder(r.Body).Decode(&data)
+		err = json.NewDecoder(r.Body).Decode(&data)
 	case "text/xml", "application/xml":
 		err = xml.NewDecoder(r.Body).Decode(&data)
 	case "application/x-www-form-urlencoded":
