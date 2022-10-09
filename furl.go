@@ -43,11 +43,6 @@ func allValid(_ string) bool {
 	return true
 }
 
-type loader interface {
-	Load() (map[string]string, error)
-	Save(key, url string) error
-}
-
 func save(_, _ string) error {
 	return nil
 }
