@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	_ "embed"
@@ -14,7 +15,6 @@ import (
 	"os/signal"
 	"strings"
 
-	"vimagination.zapto.org/byteio"
 	"vimagination.zapto.org/furl"
 )
 
@@ -85,26 +85,54 @@ func run() error {
 		}
 		defer f.Close()
 		data := make(map[string]string)
-		lr := byteio.StickyLittleEndianReader{Reader: f}
+		b := bufio.NewReader(f)
+		var length [2]byte
 		for {
-			key := lr.ReadString16()
-			if key == "" {
+			if _, err := io.ReadFull(b, length[:]); err != nil {
+				return fmt.Errorf("error reading key length: %w", err)
+			}
+			keyLength := int(length[0]) | (int(length[1]) << 8)
+			if keyLength == 0 {
 				break
 			}
-			data[key] = lr.ReadString16()
-		}
-		if lr.Err != nil && lr.Err != io.EOF {
-			return fmt.Errorf("error reading store data: %w", lr.Err)
-		}
-		lw := byteio.StickyLittleEndianWriter{Writer: f}
-		furlParams = append(furlParams, furl.SetStore(furl.NewStore(furl.Data(data), furl.Save(func(key, url string) {
-			lw.WriteString16(key)
-			lw.WriteString16(url)
-			if lw.Err == nil {
-				f.Sync()
+			key := make([]byte, keyLength)
+			if _, err = io.ReadFull(b, key); err != nil {
+				return fmt.Errorf("error reading key: %w", err)
 			}
-			if lw.Err != nil {
-				panic(lw.Err)
+			if urlLength := int(length[0]) | (int(length[1]) << 8); urlLength > 0 {
+				if _, err := io.ReadFull(b, length[:]); err != nil {
+					return fmt.Errorf("error reading url length: %w", err)
+				}
+				url := make([]byte, urlLength)
+				if _, err = io.ReadFull(b, url); err != nil {
+					return fmt.Errorf("error reading url: %w", err)
+				}
+				data[string(key)] = string(url)
+			}
+		}
+		w := bufio.NewWriter(f)
+		furlParams = append(furlParams, furl.SetStore(furl.NewStore(furl.Data(data), furl.Save(func(key, url string) {
+			length[0] = byte(len(key))
+			length[1] = byte(len(key) >> 8)
+			if _, err := w.Write(length[:]); err != nil {
+				panic(fmt.Errorf("error while writing key length: %w", err))
+			}
+			if _, err := w.WriteString(key); err != nil {
+				panic(fmt.Errorf("error while writing key: %w", err))
+			}
+			length[0] = byte(len(url))
+			length[1] = byte(len(url) >> 8)
+			if _, err := w.Write(length[:]); err != nil {
+				panic(fmt.Errorf("error while writing url length: %w", err))
+			}
+			if _, err := w.WriteString(url); err != nil {
+				panic(fmt.Errorf("error while writing url: %w", err))
+			}
+			if err := w.Flush(); err != nil {
+				panic(fmt.Errorf("error while flushing buffers: %w", err))
+			}
+			if err := f.Sync(); err != nil {
+				panic(fmt.Errorf("error while syncing file: %w", err))
 			}
 		}))))
 	}
