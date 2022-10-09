@@ -11,27 +11,42 @@ import (
 func TestOptions(t *testing.T) {
 	f := New(SetStore(NewStore(Data(map[string]string{
 		"AAA": "http://www.google.com",
-	}))))
+	}))), KeyValidator(func(key string) bool {
+		return key != "ABCD"
+	}))
 	for n, test := range [...]struct {
 		Path, Response string
+		Code           int
 	}{
-		{
+		{ // 1
 			Path:     "/",
+			Code:     http.StatusNoContent,
 			Response: optionsPost,
 		},
-		{
+		{ // 2
 			Path:     "/AAA",
+			Code:     http.StatusNoContent,
 			Response: optionsGetHead,
 		},
-		{
+		{ // 3
 			Path:     "/BBB",
+			Code:     http.StatusNoContent,
 			Response: optionsPost,
+		},
+		{ // 4
+			Path:     "/ABCD",
+			Code:     http.StatusUnprocessableEntity,
+			Response: invalidKey,
 		},
 	} {
 		w := httptest.NewRecorder()
 		f.ServeHTTP(w, httptest.NewRequest(http.MethodOptions, test.Path, nil))
-		if w.Code != http.StatusNoContent {
-			t.Errorf("test %d: expecting response code 204, got %d", n+1, w.Code)
+		if w.Code != test.Code {
+			t.Errorf("test %d: expecting response code %d, got %d", n+1, test.Code, w.Code)
+		} else if test.Code != http.StatusNoContent {
+			if response := strings.TrimSpace(w.Body.String()); response != test.Response {
+				t.Errorf("test %d: expecting response %q, got %q", n+1, test.Response, response)
+			}
 		} else if allowed := w.Header().Get("Allow"); allowed != test.Response {
 			t.Errorf("test %d: expecting Allow header of %q, got %q", n+1, test.Response, allowed)
 		}
@@ -41,33 +56,44 @@ func TestOptions(t *testing.T) {
 func TestGet(t *testing.T) {
 	f := New(SetStore(NewStore(Data(map[string]string{
 		"AAA": "http://www.google.com",
-	}))))
+	}))), KeyValidator(func(key string) bool {
+		return key != "ABCD"
+	}))
 	for n, test := range [...]struct {
-		Path, Location string
-		Status         int
+		Path, Response string
+		Code           int
 	}{
-		{
+		{ // 1
 			Path:     "/",
-			Location: "",
-			Status:   http.StatusNotFound,
+			Code:     http.StatusNotFound,
+			Response: "404 page not found",
 		},
-		{
+		{ // 2
 			Path:     "/AAA",
-			Location: "http://www.google.com",
-			Status:   http.StatusMovedPermanently,
+			Response: "http://www.google.com",
+			Code:     http.StatusMovedPermanently,
 		},
-		{
+		{ // 3
 			Path:     "/BBB",
-			Location: "",
-			Status:   http.StatusNotFound,
+			Code:     http.StatusNotFound,
+			Response: "404 page not found",
+		},
+		{ // 4
+			Path:     "/ABCD",
+			Code:     http.StatusUnprocessableEntity,
+			Response: invalidKey,
 		},
 	} {
 		w := httptest.NewRecorder()
 		f.ServeHTTP(w, httptest.NewRequest(http.MethodGet, test.Path, nil))
-		if w.Code != test.Status {
-			t.Errorf("test %d: expecting response code %d, got %d", n+1, test.Status, w.Code)
-		} else if url := w.Header().Get("Location"); url != test.Location {
-			t.Errorf("test %d: expecting Location header to be %q, got %q", n+1, test.Location, url)
+		if w.Code != test.Code {
+			t.Errorf("test %d: expecting response code %d, got %d", n+1, test.Code, w.Code)
+		} else if test.Code == http.StatusMovedPermanently {
+			if url := w.Header().Get("Location"); url != test.Response {
+				t.Errorf("test %d: expecting Location header to be %q, got %q", n+1, test.Response, url)
+			}
+		} else if response := strings.TrimSpace(w.Body.String()); response != test.Response {
+			t.Errorf("test %d: expecting response %q, got %q", n+1, test.Response, response)
 		}
 	}
 }
