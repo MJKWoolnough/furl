@@ -218,13 +218,35 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		data.Key = path.Base("/" + r.URL.Path)
 	}
 	var herr *httpError
-	f.store.Tx(func(tx Tx) {
-		if data.Key == "" || data.Key == "/" || data.Key == "." || data.Key == ".." {
-			herr = f.genKey(tx, &data)
-		} else {
-			herr = f.setKey(tx, &data)
-		}
-	})
+	if data.Key == "" || data.Key == "/" || data.Key == "." || data.Key == ".." {
+		f.store.Tx(func(tx Tx) {
+			for idLength := f.keyLength; ; idLength++ {
+				keyBytes := make([]byte, idLength)
+				for i := uint(0); i < f.retries; i++ {
+					f.rand.Read(keyBytes) // NB: will never error
+					data.Key = base64.RawURLEncoding.EncodeToString(keyBytes)
+					if ok := tx.Has(data.Key); !ok && f.keyValidator(data.Key) {
+						tx.Set(data.Key, data.URL)
+						return
+					}
+				}
+				if idLength == maxKeyLength {
+					herr = failedKeyGenerationError
+					return
+				}
+			}
+		})
+	} else if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
+		herr = invalidKeyError
+	} else {
+		f.store.Tx(func(tx Tx) {
+			if ok := tx.Has(data.Key); ok {
+				herr = keyExistsError
+			} else {
+				tx.Set(data.Key, data.URL)
+			}
+		})
+	}
 	if herr != nil {
 		writeError(w, herr.Code, contentType, herr.Error)
 		return
@@ -237,36 +259,6 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	case "text/html", "text/plain":
 		io.WriteString(w, data.Key)
 	}
-}
-
-func (f *Furl) genKey(tx Tx, data *keyURL) *httpError {
-Loop:
-	for idLength := f.keyLength; ; idLength++ {
-		keyBytes := make([]byte, idLength)
-		for i := uint(0); i < f.retries; i++ {
-			f.rand.Read(keyBytes) // NB: will never error
-			data.Key = base64.RawURLEncoding.EncodeToString(keyBytes)
-			if ok := tx.Has(data.Key); !ok && f.keyValidator(data.Key) {
-				break Loop
-			}
-		}
-		if idLength == maxKeyLength {
-			return failedKeyGenerationError
-		}
-	}
-	tx.Set(data.Key, data.URL)
-	return nil
-}
-
-func (f *Furl) setKey(tx Tx, data *keyURL) *httpError {
-	if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
-		return invalidKeyError
-	}
-	if ok := tx.Has(data.Key); ok {
-		return keyExistsError
-	}
-	tx.Set(data.Key, data.URL)
-	return nil
 }
 
 func (f *Furl) options(w http.ResponseWriter, r *http.Request) {
