@@ -138,7 +138,7 @@ type Store interface {
 }
 ```
 
-The Store interface allows for setting a custom storage solution to Furl.
+The Store interface allows for setting a custom storage solution to Furl, such as a database or keystore.
 
 The Get method should be used to retireve the URL associated with the passed key.
 
