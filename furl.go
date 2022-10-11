@@ -48,6 +48,7 @@ type Furl struct {
 	urlValidator, keyValidator func(string) bool
 	keyLength, retries         uint
 	rand                       *rand.Rand
+	index                      func(http.ResponseWriter, *http.Request, int, string)
 	store                      Store
 }
 
@@ -69,6 +70,9 @@ type Furl struct {
 //
 // store: The default store is an empty map that will not permanently record
 // the data. This can be changed by using the SetStore Option.
+//
+// index: By default, Furl offers no HTML output. This can be changed by using
+// the Index Option.
 func New(opts ...Option) *Furl {
 	f := &Furl{
 		urlValidator: allValid,
@@ -131,29 +135,43 @@ func (f *Furl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (f *Furl) get(w http.ResponseWriter, r *http.Request) {
 	key := path.Base(r.URL.Path)
 	if !f.keyValidator(key) {
-		http.Error(w, invalidKey, http.StatusUnprocessableEntity)
+		if f.index != nil {
+			f.index(w, r, http.StatusUnprocessableEntity, invalidKey)
+		} else {
+			http.Error(w, invalidKey, http.StatusUnprocessableEntity)
+		}
 		return
 	}
 	url, ok := f.store.Get(key)
 	if ok {
 		http.Redirect(w, r, url, http.StatusMovedPermanently)
 	} else {
-		http.NotFound(w, r)
+		if f.index != nil {
+			f.index(w, r, http.StatusNotFound, "404 page not found")
+		} else {
+			http.NotFound(w, r)
+		}
 	}
 }
 
-func writeError(w http.ResponseWriter, status int, contentType, err string) {
+func (f *Furl) writeResponse(w http.ResponseWriter, r *http.Request, status int, contentType, output string) {
 	var format string
 	switch contentType {
 	case "text/json", "application/json":
 		format = "{\"error\":%q}"
 	case "text/xml", "application/xml":
 		format = "<furl><error>%s</error></furl>"
+	case "text/html":
+		if f.index != nil {
+			f.index(w, r, status, output)
+			return
+		}
+		fallthrough
 	default:
 		format = "%s"
 	}
 	w.WriteHeader(status)
-	fmt.Fprintf(w, format, err)
+	fmt.Fprintf(w, format, output)
 }
 
 type keyURL struct {
@@ -187,11 +205,11 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", contentType)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, contentType, failedReadRequest)
+		f.writeResponse(w, r, http.StatusBadRequest, contentType, failedReadRequest)
 		return
 	}
 	if len(data.URL) > maxURLLength || data.URL == "" || !f.urlValidator(data.URL) {
-		writeError(w, http.StatusBadRequest, contentType, invalidURL)
+		f.writeResponse(w, r, http.StatusBadRequest, contentType, invalidURL)
 		return
 	}
 	if data.Key == "" {
@@ -221,7 +239,7 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 			}
 		})
 	} else if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
-		writeError(w, http.StatusUnprocessableEntity, contentType, invalidKey)
+		f.writeResponse(w, r, http.StatusUnprocessableEntity, contentType, invalidKey)
 		return
 	} else { // use suggested key
 		f.store.Tx(func(tx Tx) {
@@ -234,7 +252,7 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	if errCode != 0 {
-		writeError(w, errCode, contentType, errString)
+		f.writeResponse(w, r, errCode, contentType, errString)
 		return
 	}
 	switch contentType {
@@ -242,7 +260,13 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(data)
 	case "text/xml", "application/xml":
 		xml.NewEncoder(w).EncodeElement(data, xmlStart)
-	case "text/html", "text/plain":
+	case "text/html":
+		if f.index != nil {
+			f.index(w, r, http.StatusOK, data.Key)
+			return
+		}
+		fallthrough
+	case "text/plain":
 		io.WriteString(w, data.Key)
 	}
 }
