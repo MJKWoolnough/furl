@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	_ "embed"
 	"flag"
@@ -13,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 
 	"vimagination.zapto.org/furl"
@@ -37,33 +37,9 @@ func keyValidator(key string) bool {
 	return true
 }
 
-type wrappedResponseWriter struct {
-	http.ResponseWriter
-	code int
-	bytes.Buffer
-}
-
-func (w *wrappedResponseWriter) WriteHeader(code int) {
-	w.code = code
-}
-
-func (w *wrappedResponseWriter) Write(p []byte) (int, error) {
-	switch w.code {
-	case http.StatusOK: // Created a key, store the key
-		return w.Buffer.Write(p)
-	case http.StatusBadRequest, http.StatusUnprocessableEntity, http.StatusMethodNotAllowed: // Don't need the reponse from these, just the code
-		return len(p), nil
-	default: // for any other code, we write the code the first time, and forward the write buf
-		if w.code != 0 {
-			w.ResponseWriter.WriteHeader(w.code)
-			w.code = 0
-		}
-		return w.ResponseWriter.Write(p)
-	}
-}
-
 type tmplVars struct {
 	Success, URL, URLError, Key, KeyError string
+	NotFound                              bool
 }
 
 func run() error {
@@ -76,6 +52,38 @@ func run() error {
 	furlParams := []furl.Option{
 		furl.URLValidator(furl.HTTPURL),
 		furl.KeyValidator(keyValidator),
+		furl.Index(func(w http.ResponseWriter, r *http.Request, code int, data string) {
+			if r.Method == http.MethodGet {
+				isRoot := r.URL.Path == "/" || r.URL.Path == ""
+				if code == http.StatusUnprocessableEntity && !isRoot {
+					http.Redirect(w, r, "/", http.StatusFound)
+					return
+				}
+				var tv tmplVars
+				if code == http.StatusNotFound && !isRoot {
+					w.WriteHeader(code)
+					tv.NotFound = true
+					tv.Key = path.Base("/" + r.URL.Path)
+				}
+				tmpl.Execute(w, tv)
+			} else if r.Method == http.MethodPost {
+				tv := tmplVars{
+					URL: r.PostForm.Get("url"),
+				}
+				switch code {
+				case http.StatusOK:
+					tv.Key = data
+					tv.Success = *serverURL + data
+				case http.StatusBadRequest:
+					tv.URLError = "Invalid URL"
+				case http.StatusUnprocessableEntity:
+					tv.KeyError = "Invalid Alias"
+				case http.StatusMethodNotAllowed:
+					tv.KeyError = "Alias Exists"
+				}
+				tmpl.Execute(w, tv)
+			}
+		}),
 	}
 
 	if *file != "" { // if we're loading a file-back store
@@ -157,39 +165,8 @@ func run() error {
 		return fmt.Errorf("error listening on port %d: %w", *port, err)
 	}
 
-	f := furl.New(furlParams...)
-
 	server := &http.Server{
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodGet && r.URL.Path == "/" { // If we're loading the webpage
-				tmpl.Execute(w, tmplVars{})
-			} else if r.Method == http.MethodPost && r.URL.Path == "/" && r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" { // If we're recieving POST data from the webpage
-				wr := wrappedResponseWriter{
-					ResponseWriter: w,
-					code:           http.StatusOK,
-				}
-				f.ServeHTTP(&wr, r)
-				tv := tmplVars{
-					Key: r.PostForm.Get("key"),
-					URL: r.PostForm.Get("url"),
-				}
-				switch wr.code {
-				case http.StatusOK:
-					tv.Success = *serverURL + wr.Buffer.String()
-				case http.StatusBadRequest:
-					tv.URLError = "Invalid URL"
-				case http.StatusUnprocessableEntity:
-					tv.KeyError = "Invalid Alias"
-				case http.StatusMethodNotAllowed:
-					tv.KeyError = "Alias Exists"
-				default:
-					return
-				}
-				tmpl.Execute(w, tv)
-			} else {
-				f.ServeHTTP(w, r)
-			}
-		}),
+		Handler: furl.New(furlParams...),
 	}
 
 	go server.Serve(l)
