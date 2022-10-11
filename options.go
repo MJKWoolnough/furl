@@ -2,6 +2,7 @@ package furl
 
 import (
 	"math/rand"
+	"net/http"
 	"net/url"
 )
 
@@ -76,5 +77,18 @@ func SetStore(s Store) Option {
 func RandomSource(source rand.Source) Option {
 	return func(f *Furl) {
 		f.rand = rand.New(source)
+	}
+}
+
+// The Index Option allows for custom error and success output.
+//
+// For a POST request with code http.StatusOK (200), the output will be the
+// generated or specified key. In all other times, the output is the error
+// string corresponding to the error code.
+//
+// NB: The index function won't be called for JSON, XML, or Text POST requests.
+func Index(index func(w http.ResponseWriter, r *http.Request, code int, output string)) Option {
+	return func(f *Furl) {
+		f.index = index
 	}
 }
