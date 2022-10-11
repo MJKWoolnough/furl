@@ -2,6 +2,7 @@ package furl
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -500,6 +501,101 @@ func TestPostOther(t *testing.T) {
 			t.Errorf("test %d: expecting response %q, got %q", n+2, test.Response, response)
 		} else if contentType := w.Header().Get("Content-Type"); w.Code == 200 && contentType != test.ContentType {
 			t.Errorf("test %d: expecting return content type %q, got %q", n+2, test.ContentType, contentType)
+		}
+	}
+}
+
+func TestIndex(t *testing.T) {
+	var rs nonrand
+	f := New(RandomSource(&rs), CollisionRetries(1), KeyValidator(func(key string) bool {
+		return key == "AAAAAAAA" || key == "GOODKEY"
+	}), URLValidator(func(url string) bool {
+		return url != "BADURL"
+	}), Index(func(w http.ResponseWriter, r *http.Request, code int, data string) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(code)
+			io.WriteString(w, strings.ToUpper(data))
+		} else {
+			w.WriteHeader(code)
+			io.WriteString(w, data+"!")
+		}
+	}))
+	for n, test := range [...]struct {
+		Method, Path, Body, Response string
+	}{
+		{ // 1
+			Method:   "GET",
+			Path:     "/AAAAAAAA",
+			Response: "404 PAGE NOT FOUND",
+		},
+		{ // 2
+			Method:   "GET",
+			Path:     "/BADKEY",
+			Response: "INVALID KEY",
+		},
+		{ // 3
+			Method:   "POST",
+			Path:     "/",
+			Body:     "url=;",
+			Response: failedReadRequest + "!",
+		},
+		{ // 4
+			Method:   "POST",
+			Path:     "/",
+			Body:     "",
+			Response: invalidURL + "!",
+		},
+		{ // 5
+			Method:   "POST",
+			Path:     "/",
+			Body:     "url=BADURL",
+			Response: invalidURL + "!",
+		},
+		{ // 6
+			Method:   "POST",
+			Path:     "/BADKEY",
+			Body:     "url=GOODURL",
+			Response: invalidKey + "!",
+		},
+		{ // 7
+			Method:   "POST",
+			Path:     "/",
+			Body:     "key=BADKEY&url=GOODURL",
+			Response: "invalid key!",
+		},
+		{ // 8
+			Method:   "POST",
+			Path:     "/",
+			Body:     "url=GOODURL",
+			Response: "AAAAAAAA!",
+		},
+		{ // 9
+			Method:   "POST",
+			Path:     "/GOODKEY",
+			Body:     "url=GOODURL",
+			Response: "GOODKEY!",
+		},
+		{ // 10
+			Method:   "POST",
+			Path:     "/GOODKEY",
+			Body:     "url=GOODURL",
+			Response: keyExists + "!",
+		},
+		{ // 1
+			Method:   "POST",
+			Path:     "/",
+			Body:     "url=GOODURL",
+			Response: failedKeyGeneration + "!",
+		},
+	} {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(test.Method, "/"+test.Path, strings.NewReader(test.Body))
+		if test.Method == "POST" {
+			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		}
+		f.ServeHTTP(w, r)
+		if response := strings.TrimSpace(w.Body.String()); response != test.Response {
+			t.Errorf("test %d: expecting response %q, got %q", n+1, test.Response, response)
 		}
 	}
 }
