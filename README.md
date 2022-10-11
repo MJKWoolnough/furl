@@ -38,6 +38,8 @@ keyLength:    The default length of generated keys (before base64 encoding) is 6
 retries:      The default number of retries the key generator will before increasing the key length is 100 and can be changed by using the CollisionRetries Option.
 
 store:        The default store is an empty map that will not permanently record the data. This can be changed by using the SetStore Option.
+
+index:        By default, Furl offers no HTML output. This can be changed by using the Index Option.
 </pre>
 #### func (*Furl) ServeHTTP
 
@@ -87,6 +89,17 @@ The Option type is used to specify optional params to the New function call
 func CollisionRetries(retries uint) Option
 ```
 The CollisionRetries Option sets how many tries a Furl instance will retry generating keys at a given length before increasing the length in order to find a unique key.
+
+#### func  Index
+
+```go
+func Index(index func(w http.ResponseWriter, r *http.Request, code int, output string)) Option
+```
+The Index Option allows for custom error and success output.
+
+For a POST request with codee http.StatusOK (200), the output will be the generated or specified key. In all other times, the output is the error string corresponding to the error code.
+
+NB: The index function won't be called for JSON, XML, or Text POST requests.
 
 #### func  KeyLength
 
