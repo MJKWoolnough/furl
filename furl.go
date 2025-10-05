@@ -92,18 +92,23 @@ func New(opts ...Option) *Furl {
 	return f
 }
 
-// The ServeHTTP method satifies the http.Handler interface and provides the
+// The ServeHTTP method satisfies the http.Handler interface and provides the
 // following endpoints:
 // GET /[key] -  Will redirect the call to the associated URL if it exists, or
-//               will return 404 Not Found if it doesn't exists and 422
-//               Unprocessable Entity if the key is invalid.
+//
+//	will return 404 Not Found if it doesn't exists and 422
+//	Unprocessable Entity if the key is invalid.
+//
 // POST / -      The root can be used to add urls to the store with a generated
-//               key. The URL must be specified in the POST body as per the
-//               specification below.
+//
+//	key. The URL must be specified in the POST body as per the
+//	specification below.
+//
 // POST /[key] - Will attempt to create the specified path with the URL
-//               provided as below. If the key is invalid, will respond with
-//               422 Unprocessable Entity. This method cannot be used on
-//               existing keys.
+//
+//	provided as below. If the key is invalid, will respond with
+//	422 Unprocessable Entity. This method cannot be used on
+//	existing keys.
 //
 // The URL for the POST methods can be provided in a few content types:
 // application/json:                  {"key": "KEY HERE", "url": "URL HERE"}
@@ -111,7 +116,7 @@ func New(opts ...Option) *Furl {
 // application/x-www-form-urlencoded: key=KEY+HERE&url=URL+HERE
 // text/plain:                        URL HERE
 //
-// For the json, xml, and form content types, the key can be ommitted if it has
+// For the json, xml, and form content types, the key can be omitted if it has
 // been supplied in the path or if the key is to be generated.
 //
 // The response type will be determined by the POST content type:
