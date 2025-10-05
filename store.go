@@ -5,7 +5,7 @@ import "sync"
 // The Store interface allows for setting a custom storage solution to Furl,
 // such as a database or keystore.
 //
-// The Get method should be used to retireve the URL associated with the passed
+// The Get method should be used to retrieve the URL associated with the passed
 // key.
 //
 // The Tx method should start a thread safe writing context that will be used
