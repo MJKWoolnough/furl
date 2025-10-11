@@ -80,15 +80,19 @@ func New(opts ...Option) *Furl {
 		keyLength:    defaultKeyLength,
 		retries:      defaultRetries,
 	}
+
 	for _, o := range opts {
 		o(f)
 	}
+
 	if f.store == nil {
 		f.store = NewStore()
 	}
+
 	if f.rand == nil {
 		f.rand = rand.New(rand.NewSource(time.Now().UnixMicro()))
 	}
+
 	return f
 }
 
@@ -145,22 +149,23 @@ func (f *Furl) get(w http.ResponseWriter, r *http.Request) {
 		} else {
 			http.Error(w, invalidKey, http.StatusUnprocessableEntity)
 		}
+
 		return
 	}
+
 	url, ok := f.store.Get(key)
 	if ok {
 		http.Redirect(w, r, url, http.StatusMovedPermanently)
+	} else if f.index != nil {
+		f.index(w, r, http.StatusNotFound, "404 page not found")
 	} else {
-		if f.index != nil {
-			f.index(w, r, http.StatusNotFound, "404 page not found")
-		} else {
-			http.NotFound(w, r)
-		}
+		http.NotFound(w, r)
 	}
 }
 
 func (f *Furl) writeResponse(w http.ResponseWriter, r *http.Request, status int, contentType, output string) {
 	var format string
+
 	switch contentType {
 	case "text/json", "application/json":
 		format = "{\"error\":%q}"
@@ -171,10 +176,12 @@ func (f *Furl) writeResponse(w http.ResponseWriter, r *http.Request, status int,
 			f.index(w, r, status, output)
 			return
 		}
+
 		fallthrough
 	default:
 		format = "%s"
 	}
+
 	w.WriteHeader(status)
 	fmt.Fprintf(w, format, output)
 }
@@ -189,6 +196,7 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		data keyURL
 		err  error
 	)
+
 	contentType := r.Header.Get("Content-Type")
 	switch contentType {
 	case "text/json", "application/json":
@@ -202,24 +210,29 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		contentType = "text/html"
 	case "text/plain":
 		var sb strings.Builder
+
 		_, err = io.Copy(&sb, r.Body)
 		data.URL = sb.String()
 	default:
 		http.Error(w, unrecognisedContentType, http.StatusUnsupportedMediaType)
+
 		return
 	}
+
 	w.Header().Set("Content-Type", contentType)
+
 	if err != nil {
 		f.writeResponse(w, r, http.StatusBadRequest, contentType, failedReadRequest)
+
 		return
-	}
-	if len(data.URL) > maxURLLength || data.URL == "" || !f.urlValidator(data.URL) {
+	} else if len(data.URL) > maxURLLength || data.URL == "" || !f.urlValidator(data.URL) {
 		f.writeResponse(w, r, http.StatusBadRequest, contentType, invalidURL)
+
 		return
-	}
-	if data.Key == "" {
+	} else if data.Key == "" {
 		data.Key = path.Base("/" + r.URL.Path) // see if suggested key in path
 	}
+
 	var (
 		errCode   int
 		errString string
@@ -228,23 +241,28 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 		f.store.Tx(func(tx Tx) {
 			for idLength := f.keyLength; ; idLength++ {
 				keyBytes := make([]byte, idLength)
+
 				for i := uint(0); i < f.retries; i++ {
 					f.rand.Read(keyBytes) // NB: will never error
 					data.Key = base64.RawURLEncoding.EncodeToString(keyBytes)
+
 					if ok := tx.Has(data.Key); !ok && f.keyValidator(data.Key) {
 						tx.Set(data.Key, data.URL)
+
 						return
 					}
 				}
 				if idLength == maxKeyLength {
 					errCode = http.StatusInternalServerError
 					errString = failedKeyGeneration
+
 					return
 				}
 			}
 		})
 	} else if len(data.Key) > maxKeyLength || !f.keyValidator(data.Key) {
 		f.writeResponse(w, r, http.StatusUnprocessableEntity, contentType, invalidKey)
+
 		return
 	} else { // use suggested key
 		f.store.Tx(func(tx Tx) {
@@ -256,10 +274,13 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 			}
 		})
 	}
+
 	if errCode != 0 {
 		f.writeResponse(w, r, errCode, contentType, errString)
+
 		return
 	}
+
 	switch contentType {
 	case "text/json", "application/json":
 		json.NewEncoder(w).Encode(data)
@@ -270,6 +291,7 @@ func (f *Furl) post(w http.ResponseWriter, r *http.Request) {
 			f.index(w, r, http.StatusOK, data.Key)
 			return
 		}
+
 		fallthrough
 	case "text/plain":
 		io.WriteString(w, data.Key)
@@ -282,6 +304,7 @@ func (f *Furl) options(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Allow", optionsPost)
 	} else if !f.keyValidator(key) {
 		http.Error(w, invalidKey, http.StatusUnprocessableEntity)
+
 		return
 	} else {
 		_, ok := f.store.Get(key)
@@ -291,5 +314,6 @@ func (f *Furl) options(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("Allow", optionsPost)
 		}
 	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
